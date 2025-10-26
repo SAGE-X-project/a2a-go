@@ -313,19 +313,19 @@ func (j *ContentParts) UnmarshalJSON(b []byte) error {
 			if err := json.Unmarshal(rawMsg, &part); err != nil {
 				return err
 			}
-			result[i] = part
+			result[i] = &part
 		case "data":
 			var part DataPart
 			if err := json.Unmarshal(rawMsg, &part); err != nil {
 				return err
 			}
-			result[i] = part
+			result[i] = &part
 		case "file":
 			var part FilePart
 			if err := json.Unmarshal(rawMsg, &part); err != nil {
 				return err
 			}
-			result[i] = part
+			result[i] = &part
 		default:
 			return fmt.Errorf("unknown part kind %s", tp.Kind)
 		}
