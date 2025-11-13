@@ -18,21 +18,29 @@ import (
 	"context"
 	"io"
 	"iter"
+	"strings"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/a2aproject/a2a-go/a2a"
 	"github.com/a2aproject/a2a-go/a2apb"
 	"github.com/a2aproject/a2a-go/a2apb/pbconv"
 )
 
-// WithGRPCTransport returns a Client factory configuration option that if applied will
-// enable support of gRPC-A2A communication.
+// WithGRPCTransport create a gRPC transport implementation which will use the provided [grpc.DialOption]s during connection establishment.
 func WithGRPCTransport(opts ...grpc.DialOption) FactoryOption {
 	return WithTransport(
 		a2a.TransportProtocolGRPC,
 		TransportFactoryFn(func(ctx context.Context, url string, card *a2a.AgentCard) (Transport, error) {
-			conn, err := grpc.NewClient(url, opts...)
+			interceptors := []grpc.DialOption{
+				grpc.WithStreamInterceptor(newStreamGRPCInterceptor()),
+				grpc.WithUnaryInterceptor(newUnaryGRPCInterceptor()),
+			}
+			conn, err := grpc.NewClient(
+				url,
+				append(interceptors, opts...)...,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -223,4 +231,42 @@ func (c *grpcTransport) GetAgentCard(ctx context.Context) (*a2a.AgentCard, error
 
 func (c *grpcTransport) Destroy() error {
 	return c.closeConnFn()
+}
+
+func newUnaryGRPCInterceptor() grpc.UnaryClientInterceptor {
+	return func(
+		ctx context.Context,
+		method string,
+		req, reply interface{},
+		cc *grpc.ClientConn,
+		invoker grpc.UnaryInvoker,
+		opts ...grpc.CallOption,
+	) error {
+		return invoker(withGRPCMetadata(ctx), method, req, reply, cc, opts...)
+	}
+}
+
+func newStreamGRPCInterceptor() grpc.StreamClientInterceptor {
+	return func(
+		ctx context.Context,
+		desc *grpc.StreamDesc,
+		cc *grpc.ClientConn,
+		method string,
+		streamer grpc.Streamer,
+		opts ...grpc.CallOption,
+	) (grpc.ClientStream, error) {
+		return streamer(withGRPCMetadata(ctx), desc, cc, method, opts...)
+	}
+}
+
+func withGRPCMetadata(ctx context.Context) context.Context {
+	callMeta, ok := CallMetaFrom(ctx)
+	if !ok || len(callMeta) == 0 {
+		return ctx
+	}
+	meta := metadata.MD{}
+	for k, vals := range callMeta {
+		meta[strings.ToLower(k)] = vals
+	}
+	return metadata.NewOutgoingContext(ctx, meta)
 }

@@ -26,7 +26,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// ErrPushConfigNotFound indicates that a push config with the provided ID was not found
+// ErrPushConfigNotFound indicates that a push config with the provided ID was not found.
 var ErrPushConfigNotFound = errors.New("push config not found")
 
 // InMemoryPushConfigStore implements a2asrv.PushConfigStore.
@@ -42,9 +42,9 @@ func NewInMemoryStore() *InMemoryPushConfigStore {
 	}
 }
 
-// NewID creates a new random identifier.
+// newID creates a time-based random ID.
 func newID() string {
-	return uuid.NewString()
+	return uuid.Must(uuid.NewV7()).String()
 }
 
 func validateConfig(config *a2a.PushConfig) error {
